@@ -1,0 +1,246 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 262 83% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-in {
+    animation: animate-in 0.3s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Focus visible styles */
+.focus-visible-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+
+/* Prose styles for markdown content */
+.prose {
+  @apply text-muted-foreground max-w-none;
+}
+
+.prose h1 { @apply text-3xl font-bold text-foreground mb-4 mt-8; }
+.prose h2 { @apply text-2xl font-bold text-foreground mb-3 mt-6; }
+.prose h3 { @apply text-xl font-semibold text-foreground mb-2 mt-4; }
+.prose h4 { @apply text-lg font-semibold text-foreground mb-2 mt-4; }
+
+.prose p { @apply mb-4 leading-relaxed; }
+.prose ul { @apply list-disc list-inside mb-4 space-y-2; }
+.prose ol { @apply list-decimal list-inside mb-4 space-y-2; }
+.prose li { @apply leading-relaxed; }
+
+.prose code { @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono; }
+.prose pre { @apply bg-muted p-4 rounded-lg overflow-x-auto mb-4; }
+.prose pre code { @apply bg-transparent p-0 text-sm; }
+
+.prose blockquote { @apply border-l-4 border-primary pl-4 italic my-4 text-muted-foreground; }
+.prose a { @apply text-primary underline underline-offset-2 hover:text-primary/80; }
+.prose img { @apply rounded-lg my-4 max-w-full h-auto; }
+.prose table { @apply w-full border-collapse mb-4; }
+.prose th, .prose td { @apply border border-border px-4 py-2 text-left; }
+.prose th { @apply bg-muted font-semibold; }
+
+/* Video container */
+.video-container {
+  @apply relative aspect-video w-full rounded-lg overflow-hidden bg-muted;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Gradient backgrounds */
+.gradient-primary {
+  @apply bg-gradient-to-br from-primary via-primary/80 to-primary/60;
+}
+
+.gradient-hero {
+  @apply bg-gradient-to-br from-primary/10 via-background to-secondary/50;
+}
+
+/* Language badge */
+.language-badge {
+  @apply inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Exam category card */
+.exam-category-card {
+  @apply relative overflow-hidden rounded-xl p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-2;
+}
+
+/* Study plan day card */
+.study-day-card {
+  @apply relative border rounded-xl p-4 transition-all hover:border-primary/50 hover:bg-primary/5;
+}
+
+/* Quiz card */
+.quiz-card {
+  @apply border rounded-xl p-4 transition-all hover:shadow-md hover:border-primary/50;
+}
+
+/* Progress ring */
+.progress-ring {
+  @apply relative inline-flex items-center justify-center;
+}
+
+.progress-ring-circle {
+  @apply transform -rotate-90;
+}
+
+/* Animated gradient text */
+.animated-gradient-text {
+  @apply bg-gradient-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient;
+}
+
+@keyframes gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
+/* Loading skeleton */
+.skeleton {
+  @apply animate-pulse bg-muted rounded;
+}
+
+/* Tooltip custom */
+.tooltip-content {
+  @apply z-50 px-3 py-1.5 text-sm text-popover-foreground bg-popover border shadow-md rounded-md;
+}
+
+/* Mobile menu animation */
+.mobile-menu-enter {
+  animation: slideDown 0.2s ease-out;
+}
+
+.mobile-menu-exit {
+  animation: slideUp 0.2s ease-in;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body { background: white !important; color: black !important; }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --ring: 0 0% 0%;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

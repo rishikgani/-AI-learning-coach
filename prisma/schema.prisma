@@ -1,0 +1,578 @@
+// Prisma Schema for AI Personalized Learning Coach
+// Supports: Students, Hosts/Admins, Content (Notes, Videos), Exams, Categories, Progress, AI Settings
+// All enums converted to String for SQLite compatibility
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ USER & AUTH ============
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // For email/password auth (hashed)
+  role          String    @default("STUDENT")  // STUDENT, HOST, ADMIN
+  language      String    @default("ENGLISH")  // ENGLISH, HINDI, TELUGU
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+
+  // Student specific
+  studentProfile StudentProfile?
+
+  // Host/Admin specific
+  hostProfile   HostProfile?
+
+  // Progress tracking
+  studyProgress    StudyProgress[]
+  quizAttempts     QuizAttempt[]
+  bookmarks        Bookmark[]
+  aiUsage          AIUsage[]
+  studyPlans       StudyPlan[]
+  authoredContent  Content[]
+
+  // AI Configuration
+  aiConfig         AIConfig?
+
+  @@index([email])
+  @@index([role])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============ STUDENT PROFILE ============
+
+model StudentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Learning preferences
+  targetExams     String    @default("[]")  // JSON array: ["JEE_MAINS", "NEET", "UPSC"]
+  currentClass    String?   // e.g., "10th", "12th", "BTech_CSE_2nd_Year"
+  board           String?   // CBSE, ICSE, State Board, etc.
+  stream          String?   // Science, Commerce, Arts, Engineering
+  specialization  String?   // For engineering: CSE, EEE, AIML, etc.
+
+  // Study preferences
+  dailyStudyTime  Int       @default(60) // minutes
+  preferredLanguages String     @default("[\"ENGLISH\"]")  // JSON array
+
+  // Goals
+  shortTermGoal   String?
+  longTermGoal    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ============ HOST/ADMIN PROFILE ============
+
+model HostProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Host info
+  institution String?
+  department  String?
+  bio         String?
+  website     String?
+
+  // Permissions
+  canCreateContent   Boolean @default(true)
+  canManageUsers     Boolean @default(false)
+  canViewAnalytics   Boolean @default(true)
+  canManageExams     Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============ EXAM & CATEGORY HIERARCHY ============
+
+model ExamCategory {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Engineering", "Medical", "Competitive", "School"
+  slug        String   @unique
+  description String?
+  icon        String?
+  color       String?  // Hex color for UI
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  exams       Exam[]
+  subjects    Subject[]
+
+  @@index([slug])
+  @@index([isActive, order])
+}
+
+model Exam {
+  id              String   @id @default(cuid())
+  name            String   // e.g., "JEE Mains", "NEET UG", "UPSC CSE"
+  slug            String   @unique
+  shortName       String?  // e.g., "JEE", "NEET", "UPSC"
+  categoryId      String
+  category        ExamCategory @relation(fields: [categoryId], references: [id])
+  description     String?
+  eligibility     String?
+  pattern         String?  // Exam pattern info
+  syllabusUrl     String?
+  officialWebsite String?
+  isActive        Boolean  @default(true)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subjects        Subject[]
+  topics          Topic[]
+  studyPlans      StudyPlan[]
+  quizzes         Quiz[]
+  contents        Content[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Physics", "Mathematics", "Computer Science"
+  slug        String
+  categoryId  String
+  category    ExamCategory @relation(fields: [categoryId], references: [id])
+  examId      String?
+  exam        Exam?    @relation(fields: [examId], references: [id])
+  description String?
+  code        String?  // Subject code
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  topics      Topic[]
+  contents    Content[]
+
+  @@unique([slug, examId])
+  @@index([categoryId])
+  @@index([examId])
+}
+
+// ============ CONTENT SYSTEM ============
+
+model Topic {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  examId      String?
+  exam        Exam?    @relation(fields: [examId], references: [id])
+  description String?
+  difficulty  String   @default("MEDIUM")  // BEGINNER, EASY, MEDIUM, HARD, EXPERT
+  estimatedHours Float? @default(1)
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contents        Content[]
+  quizzes       Quiz[]
+  progress      StudyProgress[]
+  studyPlanTopics StudyPlanTopic[]
+
+  @@unique([slug, subjectId])
+  @@index([subjectId])
+  @@index([examId])
+}
+
+model Content {
+  id          String       @id @default(cuid())
+  title       String
+  slug        String       @unique
+  type        String       // NOTE, VIDEO, HANDWRITTEN_NOTE, QUIZ, PYQ, MOCK_TEST, FORMULA_SHEET, MINDMAP, CHEAT_SHEET
+  topicId     String
+  topic       Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  examId      String?
+  exam        Exam?        @relation(fields: [examId], references: [id])
+
+  // Content data
+  description String?
+  language    String       @default("ENGLISH")  // ENGLISH, HINDI, TELUGU
+
+  // For notes (markdown content)
+  markdownContent String?
+  htmlContent   String?
+
+  // For videos
+  videoUrl    String?
+  videoProvider String?   // YOUTUBE, VIMEO, SELF_HOSTED, GOOGLE_DRIVE
+  videoDuration Int?       // in seconds
+  thumbnailUrl String?
+
+  // For handwritten notes (images/PDFs)
+  fileUrl     String?
+  fileType    String?      // pdf, jpg, png, etc.
+  fileSize    Int?
+
+  // Metadata
+  authorId    String?
+  author      User?        @relation(fields: [authorId], references: [id])
+  tags        String    @default("[]")
+  difficulty  String       @default("MEDIUM")  // BEGINNER, EASY, MEDIUM, HARD, EXPERT
+  viewCount   Int          @default(0)
+  downloadCount Int        @default(0)
+  isPublished Boolean      @default(true)
+  isFree      Boolean      @default(true)
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  publishedAt DateTime?
+
+  bookmarks   Bookmark[]
+  progress    StudyProgress[]
+
+  @@index([topicId])
+  @@index([subjectId])
+  @@index([examId])
+  @@index([language])
+  @@index([type])
+  @@index([isPublished])
+}
+
+// ============ QUIZ SYSTEM ============
+
+model Quiz {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  topicId     String
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  examId      String?
+  exam        Exam?    @relation(fields: [examId], references: [id])
+
+  // Quiz settings
+  timeLimit   Int?     // minutes, null = no limit
+  questionCount Int    @default(10)
+  passingScore Int     @default(60) // percentage
+  difficulty  String   @default("MEDIUM")  // BEGINNER, EASY, MEDIUM, HARD, EXPERT
+  language    String   @default("ENGLISH")  // ENGLISH, HINDI, TELUGU
+
+  // Source
+  source      String   @default("MANUAL")  // MANUAL, AI_GENERATED, PYQ
+  aiModel     String?
+  aiPrompt    String?
+  isPublished Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions   QuizQuestion[]
+  attempts    QuizAttempt[]
+
+  @@index([topicId])
+  @@index([examId])
+  @@index([isPublished])
+}
+
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  quizId        String
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question      String
+  type          String   @default("MCQ")  // MCQ, MSQ, TRUE_FALSE, FILL_BLANK, NUMERICAL, SHORT_ANSWER, LONG_ANSWER
+  options       String    @default("[]") // JSON array of options
+  correctAnswer String   // For MCQ: option index, for others: answer text
+  explanation   String?
+  difficulty    String   @default("MEDIUM")  // BEGINNER, EASY, MEDIUM, HARD, EXPERT
+  marks         Int      @default(1)
+  negativeMarks Float    @default(0)
+  order         Int      @default(0)
+  tags          String   @default("[]")
+  language      String   @default("ENGLISH")  // ENGLISH, HINDI, TELUGU
+
+  // For AI-generated tracking
+  aiGenerated   Boolean  @default(false)
+  aiModel       String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  attempts      QuizAttemptAnswer[]
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId        String
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  // Results
+  score         Float    // percentage
+  totalMarks    Int
+  obtainedMarks Int
+  timeTaken     Int      // seconds
+  status        String   @default("COMPLETED")  // IN_PROGRESS, COMPLETED, ABANDONED, TIMED_OUT
+
+  // Detailed answers
+  answers       QuizAttemptAnswer[]
+
+  // Analysis
+  weakTopics    String   @default("[]") // Topic IDs where score < 50%
+  strongTopics  String   @default("[]") // Topic IDs where score >= 80%
+  recommendations String?
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([quizId])
+  @@index([status])
+}
+
+model QuizAttemptAnswer {
+  id              String   @id @default(cuid())
+  attemptId       String
+  attempt         QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userAnswer      String
+  isCorrect       Boolean
+  marksObtained   Float
+  timeTaken       Int      // seconds per question
+  createdAt       DateTime @default(now())
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+// ============ STUDY PROGRESS & PLANS ============
+
+model StudyPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id])
+
+  // Plan details
+  title       String
+  description String?
+  targetDate  DateTime
+  dailyHours  Float    @default(2)
+
+  // AI generated
+  isAIGenerated Boolean @default(false)
+  aiModel     String?
+  aiPrompt    String?
+  status      String   @default("ACTIVE")  // DRAFT, ACTIVE, COMPLETED, PAUSED, ARCHIVED
+  progress    Float     @default(0) // percentage
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  topics      StudyPlanTopic[]
+
+  @@index([userId])
+  @@index([examId])
+  @@index([status])
+}
+
+model StudyPlanTopic {
+  id          String   @id @default(cuid())
+  planId      String
+  plan        StudyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  topicId     String
+  topic       Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  // Scheduling
+  dayNumber   Int      // Day 1, Day 2, etc.
+  order       Int      @default(0)
+  estimatedHours Float @default(1)
+
+  // Progress
+  status      String   @default("PENDING")  // PENDING, IN_PROGRESS, COMPLETED, REVISION_NEEDED, SKIPPED
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([planId, topicId])
+  @@index([planId])
+  @@index([dayNumber])
+}
+
+model StudyProgress {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId         String
+  topic           Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  contentId       String?
+  content         Content? @relation(fields: [contentId], references: [id])
+
+  // Progress tracking
+  status          String   @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, REVISITING, MASTERED
+  timeSpent       Int      @default(0) // seconds
+  lastPosition    Int      @default(0) // For videos: timestamp, for notes: scroll position
+  completionCount Int      @default(0)
+
+  // Self assessment
+  confidence      String?  // VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH (1-5)
+  notes           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastAccessedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, topicId])
+  @@unique([userId, contentId])
+  @@index([userId])
+  @@index([topicId])
+  @@index([status])
+}
+
+// ============ BOOKMARKS ============
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, contentId])
+  @@index([userId])
+}
+
+// ============ AI USAGE TRACKING ============
+
+model AIUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Request details
+  feature     String   // STUDY_PLAN_GENERATION, CONTENT_GENERATION, QUIZ_GENERATION, DOUBT_SOLVING, EXPLANATION, SUMMARIZATION, TRANSLATION, RECOMMENDATION, OTHER
+  model       String   // e.g., "gemini-1.5-flash", "gpt-4o-mini", "claude-3-haiku"
+  provider    String   // google, openai, anthropic, etc.
+  tokensUsed  Int      @default(0)
+  costEstimate Float   @default(0) // Estimated cost in USD
+
+  // Request/Response
+  prompt      String?
+  response    String?
+  // Metadata
+  metadata    String?
+  success     Boolean  @default(true)
+  errorMessage String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([feature])
+  @@index([createdAt])
+}
+
+// ============ AI CONFIGURATION ============
+
+model AIConfig {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Provider preferences
+  defaultProvider String?  // e.g., 'google', 'groq', 'openrouter'
+  defaultModel    String?  // e.g., 'gemini-1.5-flash'
+
+  // API Keys (encrypted in production)
+  geminiApiKey     String?
+  groqApiKey       String?
+  openrouterApiKey String?
+  openaiApiKey     String?
+  anthropicApiKey  String?
+  togetherApiKey   String?
+  huggingfaceApiKey String?
+
+  // Settings
+  defaultTemperature Float   @default(0.7)
+  defaultMaxTokens   Int     @default(4096)
+  enableAI           Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============ SYSTEM SETTINGS ============
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String    @default("STRING")  // STRING, NUMBER, BOOLEAN, JSON
+  description String?
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
